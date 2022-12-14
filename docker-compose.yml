@@ -5,6 +5,9 @@ services:
     image: "deepset/haystack:cpu-main"
     ports:
       - 8000:8000
+    volumes:
+      - apidata1:/opt:rw
+      - apimodelcache:/root/.cache/huggingface:rw
     restart: on-failure
     environment:
       # See rest_api/pipeline/pipelines.haystack-pipeline.yml for configurations of Search & Indexing Pipeline.
@@ -17,11 +20,11 @@ services:
         condition: service_healthy
 
   elasticsearch:
-    # This image is "ready-to-query" with some indexed articles
-    # about countries and capital cities from Wikipedia:
-    image: "deepset/elasticsearch-countries-and-capitals"
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.2
     ports:
       - 9200:9200
+    volumes:
+      - esdata1:/usr/share/elasticsearch/data:rw
     restart: on-failure
     environment:
       - discovery.type=single-node
@@ -30,7 +33,7 @@ services:
         test: curl --fail http://localhost:9200/_cat/health || exit 1
         interval: 10s
         timeout: 1s
-        retries: 10
+        retries: 10      
 
   ui:
     depends_on:
@@ -51,3 +54,10 @@ services:
       - DEFAULT_QUESTION_AT_STARTUP
       - DEFAULT_DOCS_FROM_RETRIEVER
       - DEFAULT_NUMBER_OF_ANSWERS
+volumes:
+  esdata1:
+    driver: local
+  apidata1:
+    driver: local
+  apimodelcache:
+    driver: local
