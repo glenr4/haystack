@@ -1,0 +1,61 @@
+# To allow your IDE to autocomplete and validate your YAML pipelines name them as <name of your choice>.haystack-pipeline.yml
+
+version: ignore
+
+components:    # define all the building-blocks for Pipeline
+  - name: DocumentStore
+    type: ElasticsearchDocumentStore
+    params:
+      host: localhost
+  - name: Retriever
+    type: DensePassageRetriever
+    params:
+      document_store: DocumentStore    # params can reference other components defined in the YAML
+      query_embedding_model: facebook/dpr-question_encoder-single-nq-base
+      passage_embedding_model: facebook/dpr-ctx_encoder-single-nq-base
+      use_gpu: False
+      embed_title: True
+
+  - name: Generator       # custom-name for the component; helpful for visualization & debugging
+    type: RAGenerator    # Haystack Class name for the component
+    params:
+      model_name_or_path: facebook/rag-token-nq
+      use_gpu: True
+      top_k: 1
+      max_length: 200
+      min_length: 2
+      embed_title: True
+      num_beams: 2
+  - name: TextFileConverter
+    type: TextConverter
+  - name: PDFFileConverter
+    type: PDFToTextConverter
+  - name: Preprocessor
+    type: PreProcessor
+    params:
+      split_by: word
+      split_length: 1000
+  - name: FileTypeClassifier
+    type: FileTypeClassifier
+
+pipelines:
+  - name: query
+    nodes:
+      - name: Retriever
+        inputs: [Query]
+      - name: Generator
+        inputs: [Retriever]
+  - name: indexing
+    nodes:
+      - name: FileTypeClassifier
+        inputs: [File]
+      - name: TextFileConverter
+        inputs: [FileTypeClassifier.output_1]
+      - name: PDFFileConverter
+        inputs: [FileTypeClassifier.output_2]
+      - name: Preprocessor
+        inputs: [PDFFileConverter, TextFileConverter]
+      - name: Retriever
+        inputs: [Preprocessor]
+      - name: DocumentStore
+        inputs: [Retriever]
